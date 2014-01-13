@@ -35,7 +35,7 @@ def getBasePath():
   pwd = os.getcwd()
   return os.path.join(pwd, sys.argv[1])
 
-def getErrorFiles(group):
+def getErrorFiles(group=0):
   """
     Returns a list of files in error_output directory that come from
     a given group of runs.
