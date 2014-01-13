@@ -24,17 +24,6 @@ def processArgs():
   for param in args.__dict__:
     params[param] = args.__dict__[param]
 
-def getBasePath():
-  """
-    Returns path to the base LLFI output directory by parsing ARGV.
-  """
-  if len(sys.argv) < 2:
-    print "usage: {} <directory>".format(sys.argv[0])
-    sys.exit(errno.EINVAL)
-
-  pwd = os.getcwd()
-  return os.path.join(pwd, sys.argv[1])
-
 def getErrorFiles(group=0):
   """
     Returns a list of files in error_output directory that come from
