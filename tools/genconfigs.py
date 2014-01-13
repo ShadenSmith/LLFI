@@ -7,22 +7,20 @@ import re
 import argparse
 
 # Commonly used parameters - see processArgs()
-params = {}
+params = None
 
 def processArgs():
+  global params
   parser = argparse.ArgumentParser()
   parser.add_argument('DIR', help='base LLFI output directory')
   parser.add_argument('-n' , '--nconfigs', help='number of configs to print',
-                      default=1)
+                      default=1, type=int)
   parser.add_argument('-c' , '--code', help='return code to filter by',
-                      default=-11)
+                      default=-11, type=int)
   parser.add_argument('-g' , '--group', help='run group ID to scan',
-                      default=0)
-  parser.add_argument('-v' , '--verbose', default=False)
-  args = parser.parse_args()
-
-  for param in args.__dict__:
-    params[param] = args.__dict__[param]
+                      default=0, type=int)
+  parser.add_argument('-v' , '--verbose', action='store_true')
+  params = parser.parse_args()
 
 def getErrorFiles(group=0):
   """
@@ -30,7 +28,7 @@ def getErrorFiles(group=0):
     a given group of runs.
   """
   regex = re.compile(".*run-{}-(\d+)$".format(group))
-  path = os.path.join(params["DIR"], "error_output")
+  path = os.path.join(params.DIR, "error_output")
   files = os.listdir(path)
   files = [os.path.join(path, f) for f in files if regex.match(f)]
   return files
@@ -65,7 +63,7 @@ def getConfig(group=0, runID=0):
 
   keyval = re.compile("^(\w+)=(\w+),?$")
 
-  path = os.path.join(params["DIR"], "llfi_stat_output")
+  path = os.path.join(params.DIR, "llfi_stat_output")
   name = "llfi.stat.fi.injectedfaults.{}-{}.txt".format(group,runID)
   fname = os.path.join(path, name)
   with open(fname) as f:
@@ -85,24 +83,24 @@ def printConfigs(configs):
   """
     Pretty prints a list of configs to be used for future use by LLFI.
   """
-  i = 0
-  for conf in configs:
-    if i == params["nconfigs"]:
-      break
-    for (key,val) in conf.items():
+  end = min(len(configs),params.nconfigs)
+  for i in range(end):
+    for (key,val) in configs[i].items():
       print "{}={}".format(key,val)
-    print ""
-    i += 1
+    # separate configs by a newline
+    if i != end - 1:
+      print ""
 
 if __name__ == '__main__':
   processArgs()
 
-  if(params["verbose"]):
-    print "Processing runs with return code: {}".format(params["code"])
+  if(params.verbose):
+    print "Processing runs with return code: {}".format(params.code)
 
-  err_runs = getErrorRunIDs(group=params["group"], code=params["code"])
-  if(params["verbose"]):
-    print "Run IDs: {}".format(" ".join(err_runs))
+  err_runs = getErrorRunIDs(group=params.group, code=params.code)
+  if(params.verbose):
+    print "{} run IDs: {}".format(len(err_runs), " ".join(err_runs))
+    print ""
 
   configs = [getConfig(runID=r) for r in err_runs]
   printConfigs(configs)
