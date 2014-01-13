@@ -97,7 +97,6 @@ def printConfigs(configs):
 if __name__ == '__main__':
   processArgs()
 
-  # TODO: Get input from ARGV
   if(params["verbose"]):
     print "Processing runs with return code: {}".format(params["code"])
 
