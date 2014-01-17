@@ -3,6 +3,8 @@
 config/llvm_paths.cmake
 config/llvm_paths.py
 
+*.pyc
+
 # vim swap files
 *.swp
 
