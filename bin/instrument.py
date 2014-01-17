@@ -1,23 +1,14 @@
 #!/usr/bin/env python3
 
 """
+llfi-instrument takes a single IR file as input and generates IR files (and
+executables, depending on the -IRonly option) with instrumented profiling and
+fault injection function calls
 
-%(prog)s takes a single IR file as input and generates IR files (and executables, depending on the -IRonly option) with instrumented profiling and fault injection function calls
-
-Usage: %(prog)s [OPTIONS] <source IR file>
-
-List of options:
-
---dir <relative directory>: Generate the instrumented IRs and executables to '<directory of source IR file>/<relative directory>', default: llfi
--L <library directory>:     Add <library directory> to the search directories for -l
--l<library>:                link <library>
---readable:                 Generate human-readable IR files
---IRonly:                   Only generate the instrumented IR files, and you will do the linking and create the executables manually
---verbose:                  Show verbose information
---help(-h):                 Show help information
 
 Prerequisite:
-You need to have 'input.yaml' under the same directory as <source IR file>, which contains appropriate options for LLFI
+  1. 'input.yaml' contains appropriate options for LLFI and must be under the
+     same directory as IR_FILE
 """
 
 # Everytime the contents of compileOption is changed in input.yaml
@@ -26,11 +17,11 @@ You need to have 'input.yaml' under the same directory as <source IR file>, whic
 import sys, os, shutil
 import yaml
 import subprocess
+import argparse
 
 script_path = os.path.realpath(os.path.dirname(__file__))
 sys.path.append(os.path.join(script_path, '../config'))
 import llvm_paths
-
 
 optbin = os.path.join(llvm_paths.LLVM_DST_ROOT, "bin/opt")
 llcbin = os.path.join(llvm_paths.LLVM_DST_ROOT, "bin/llc")
@@ -48,18 +39,70 @@ else:
   print("ERROR: LLFI does not support platform " + sys.platform + ".")
   exit(1)
 
+def help():
+  parser = initParser()
+  parser.print_help()
 
-options = {
-  "dir": "llfi",
-  "source": "",
-  "L": [],
-  "l": [],
-  "readable": False,
-  "verbose": False,
-  "IRonly": False,
-  "genDotGraph": False,
-}
+################################################################################
+def run(args):
+  parser = initParser()
+  options = parseArgs(parser, args)
+  yamlOpts = checkInputYaml(options)
+  compileOptions = readCompileOption(yamlOpts, options)
+  compileProg(options, compileOptions)
+################################################################################
 
+def initParser():
+  parser = argparse.ArgumentParser(
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    prog='llfi instrument',
+    epilog=__doc__,
+  )
+  parser.add_argument('IR_FILE', help='source IR file to instrument')
+  parser.add_argument('--dir', default='llfi', dest='DIR',
+                      help='directory to store instrumented executables')
+  parser.add_argument('-l',  action='append', metavar='LIB',
+                      help='link against LIB')
+  parser.add_argument('-L', action='append', metavar='DIR',
+                      help='add DIR to search path for linking')
+  parser.add_argument('--readable', action='store_true', dest='READABLE',
+                      help='generate human-readable IR files')
+  parser.add_argument('--IRonly', action='store_true',
+                      help='only generate instrumented IR files; linking and \
+                      executable generation will be done manually')
+  parser.add_argument('-v', '--verbose', action='store_true', dest='VERBOSE',
+                      help='show verbose information')
+  # secret option set by YAML
+  parser.add_argument('--gendotgraph',dest='GEN_DOT_GRAPH',action='store_true',
+                      help=argparse.SUPPRESS)
+  return parser
+
+def parseArgs(parser, args):
+  options = parser.parse_args(args)
+
+  # some post processing is necessary
+  options.DIR = options.DIR.rstrip('/')
+  options.IR_FILE = os.path.join(basedir, options.IR_FILE)
+  for _, d in enumerate(options.L):
+    d = os.path.join(basedir, d)
+
+  if '/' in options.DIR:
+    usage("Cannot specify embedded directories for --dir")
+  else:
+    srcpath = os.path.dirname(options.IR_FILE)
+    fullpath = os.path.join(srcpath, options.DIR)
+    if os.path.exists(fullpath):
+      usage(options.DIR + " already exists under " + srcpath + \
+            ", you can either specify a different directory for --dir or " +\
+            "remove " + options.DIR + " from " + srcpath)
+    else:
+      try:
+        os.mkdir(fullpath)
+        options.DIR = fullpath
+      except:
+        usage("Unable to create a directory named " + options.DIR +\
+              " under " + srcpath)
+  return options
 
 def usage(msg = None):
   retval = 0
@@ -75,108 +118,52 @@ def verbosePrint(msg, verbose):
   if verbose:
     print(msg)
 
-
-def parseArgs(args):
-  global options
-  argid = 0
-  while argid < len(args):
-    arg = args[argid]
-    if arg.startswith("-"):
-      if arg == "--dir":
-        if options["dir"] != "llfi":
-          usage("Duplicated argument: " + arg)
-        argid += 1
-        options["dir"] = args[argid].rstrip('/')
-      elif arg == "-L":
-        argid += 1
-        options["L"].append(os.path.join(basedir, args[argid]))
-      elif arg.startswith("-l"):
-        options["l"].append(arg[2:])
-      elif arg == "--readable":
-        options["readable"] = True
-      elif arg == "--verbose":
-        options["verbose"] = True
-      elif arg == "--IRonly":
-        options["IRonly"] = True
-      elif arg == "--help" or arg == "-h":
-        usage()
-      else:
-        usage("Invalid argument: " + arg)
-    else:
-      if options["source"] != "":
-        usage("More than one source files are specified")
-      options["source"] = os.path.join(basedir, arg)
-    argid += 1
-
-  if options["source"] == "":
-    usage("No input IR file specified")
-
-  if '/' in options["dir"]:
-    usage("Cannot specify embedded directories for --dir")
-  else:
-    srcpath = os.path.dirname(options["source"])
-    fullpath = os.path.join(srcpath, options["dir"])
-    if os.path.exists(fullpath):
-      usage(options["dir"] + " already exists under " + srcpath + \
-            ", you can either specify a different directory for --dir or " +\
-            "remove " + options["dir"] + " from " + srcpath)
-    else:
-      try:
-        os.mkdir(fullpath)
-        options["dir"] = fullpath
-      except:
-        usage("Unable to create a directory named " + options["dir"] +\
-              " under " + srcpath)
-    
-
-def checkInputYaml():
+def checkInputYaml(options):
   #Check for input.yaml's presence
-  global cOpt
-  srcpath = os.path.dirname(options["source"])
+  srcpath = os.path.dirname(options.IR_FILE)
   try:
     f = open(os.path.join(srcpath, 'input.yaml'), 'r')
   except:
     print("ERROR: No input.yaml file in the %s directory." % srcpath)
-    os.rmdir(options["dir"])
+    os.rmdir(options.DIR)
     exit(1)
-  
+
   #Check for input.yaml's correct formmating
   try:
     doc = yaml.load(f)
     f.close()
-    verbosePrint(yaml.dump(doc), options["verbose"])
+    verbosePrint(yaml.dump(doc), options.VERBOSE)
   except:
     print("Error: input.yaml is not formatted in proper YAML (reminder: use spaces, not tabs)")
-    os.rmdir(options["dir"])
+    os.rmdir(options.DIR)
     exit(1)
 
   #Check for compileOption in input.yaml
+  cOpt = None
   try:
     cOpt = doc["compileOption"]
   except:
-    os.rmdir(options["dir"])
     print("ERROR: Please include compileOptions in input.yaml.")
+    os.rmdir(options.DIR)
     exit(1)
+  return cOpt
 
-
-    
 ################################################################################
-def execCompilation(execlist):
-  verbosePrint(' '.join(execlist), options["verbose"])
+def execCompilation(execlist, options):
+  verbosePrint(' '.join(execlist), options.VERBOSE)
   p = subprocess.Popen(execlist)
   p.wait()
   return p.returncode
 
 ################################################################################
-def readCompileOption():
-  global compileOptions
-  
+def readCompileOption(cOpt, options):
+  compileOptions = []
+
   ###Instruction selection method
-  if "instSelMethod" not in cOpt:  
+  if "instSelMethod" not in cOpt:
     print ("\n\nERROR: Please include an 'instSelMethod' key value pair under compileOption in input.yaml.\n")
     exit(1)
   else:
-    compileOptions = []
     validMethods = ["insttype", "funcname", "custominstselector"]
     # Generate list of instruction selection methods
     # TODO: Generalize and document
@@ -192,7 +179,7 @@ def readCompileOption():
         compileOptions.append('-custominstselector')
         compileOptions.append('-fiinstselectorname='+method[methodName])
         continue # custom selectors don't have attributes
-      
+
       # Ensure that 'include' is specified at least
       # TODO: This isn't a very extendible way of doing this.
       if methodName != "custominstselector" and "include" not in method[methodName]:
@@ -213,7 +200,7 @@ def readCompileOption():
         compileOptions.extend(opts)
 
   ###Register selection method
-  if "regSelMethod" not in cOpt:  
+  if "regSelMethod" not in cOpt:
     print ("\n\nERROR: Please include an 'regSelMethod' key value pair under compileOption in input.yaml.\n")
     exit(1)
   else:
@@ -229,7 +216,7 @@ def readCompileOption():
     #Select by custom register
     elif cOpt["regSelMethod"]  == 'customregselector':
       compileOptions.append('-customregselector')
-      if "customRegSelector" not in cOpt:  
+      if "customRegSelector" not in cOpt:
         print ("\n\nERROR: An 'customRegSelector' key value pair must be present for the customregselector method in input.yaml.\n")
         exit(1)
       else:
@@ -242,7 +229,7 @@ def readCompileOption():
       print ("\n\nERROR: Unknown Register selection method in input.yaml.\n")
       exit(1)
 
-  ###Injection Trace selection 
+  ###Injection Trace selection
   if "includeInjectionTrace" in cOpt:
     for trace in cOpt["includeInjectionTrace"]:
       if trace == 'forward':
@@ -272,73 +259,73 @@ def readCompileOption():
 
       ###Dot Graph Generation selection
       if "generateCDFG" in cOpt["tracingPropagationOption"]:
-        options["genDotGraph"] = True
-  
+        options.GEN_DOT_GRAPH = True
+
+  return compileOptions
 
 ################################################################################
-def _suffixOfIR():
-  if options["readable"]:
+def _suffixOfIR(options):
+  if options.READABLE:
     return ".ll"
   else:
     return ".bc"
 
-def compileProg():
-  global proffile, fifile, compileOptions
-  srcbase = os.path.basename(options["source"])
-  progbin = os.path.join(options["dir"], srcbase[0 : srcbase.rfind(".")])
+def compileProg(options, compileOptions):
+  srcbase = os.path.basename(options.IR_FILE)
+  progbin = os.path.join(options.DIR, srcbase[0 : srcbase.rfind(".")])
 
   llfi_indexed_file = progbin + "-llfi_index"
   proffile = progbin + "-profiling"
   fifile = progbin + "-faultinjection"
   tmpfiles = []
 
-  execlist = [optbin, '-load', llfilib, '-genllfiindexpass','-o', 
-              llfi_indexed_file + _suffixOfIR(), options['source']]
-  if options["readable"]:
+  execlist = [optbin, '-load', llfilib, '-genllfiindexpass','-o',
+              llfi_indexed_file + _suffixOfIR(options), options.IR_FILE]
+  if options.READABLE:
     execlist.append('-S')
-  if options["genDotGraph"]:
+  if options.GEN_DOT_GRAPH:
     execlist.append('-dotgraphpass')
-  retcode = execCompilation(execlist)
-  
+  retcode = execCompilation(execlist, options)
+
   if retcode == 0:
     execlist = [optbin, '-load', llfilib, '-profilingpass']
-    execlist2 = ['-o', proffile + _suffixOfIR(), llfi_indexed_file + _suffixOfIR()]
+    execlist2 = ['-o', proffile + _suffixOfIR(options), llfi_indexed_file + _suffixOfIR(options)]
     execlist.extend(compileOptions)
     execlist.extend(execlist2)
-    if options["readable"]:
+    if options.READABLE:
       execlist.append("-S")
-    retcode = execCompilation(execlist)
+    retcode = execCompilation(execlist, options)
 
   if retcode == 0:
     execlist = [optbin, '-load', llfilib, "-faultinjectionpass"]
-    execlist2 = ['-o', fifile + _suffixOfIR(), llfi_indexed_file + _suffixOfIR()]
+    execlist2 = ['-o', fifile + _suffixOfIR(options), llfi_indexed_file + _suffixOfIR(options)]
     execlist.extend(compileOptions)
     execlist.extend(execlist2)
-    if options["readable"]:
+    if options.READABLE:
       execlist.append("-S")
-    retcode = execCompilation(execlist)
+    retcode = execCompilation(execlist, options)
 
   if retcode != 0:
     print("\nERROR: there was an error during running the "\
                          "instrumentation pass, please follow"\
                          " the provided instructions for %s." % prog, file=sys.stderr)
-    shutil.rmtree(options['dir'], ignore_errors = True)
+    shutil.rmtree(options.DIR, ignore_errors = True)
     sys.exit(retcode)
 
-  if not options["IRonly"]:
+  if not options.IRonly:
     if retcode == 0:
-      execlist = [llcbin, '-filetype=obj', '-o', proffile + '.o', proffile + _suffixOfIR()]
+      execlist = [llcbin, '-filetype=obj', '-o', proffile + '.o', proffile + _suffixOfIR(options)]
       tmpfiles.append(proffile + '.o')
-      retcode = execCompilation(execlist)
+      retcode = execCompilation(execlist, options)
     if retcode == 0:
-      execlist = [llcbin, '-filetype=obj', '-o', fifile + '.o', fifile + _suffixOfIR()]
+      execlist = [llcbin, '-filetype=obj', '-o', fifile + '.o', fifile + _suffixOfIR(options)]
       tmpfiles.append(fifile + '.o')
-      retcode = execCompilation(execlist)
+      retcode = execCompilation(execlist, options)
 
     liblist = []
-    for lib_dir in options["L"]:
+    for lib_dir in options.L:
       liblist.extend(["-L", lib_dir])
-    for lib in options["l"]:
+    for lib in options.l:
       liblist.append("-l" + lib)
     liblist.append("-Wl,-rpath")
     liblist.append(llfilinklib)
@@ -346,19 +333,19 @@ def compileProg():
     if retcode == 0:
       execlist = [llvmgcc, '-o', proffile + '.exe', proffile + '.o', '-L'+llfilinklib , '-lllfi-rt']
       execlist.extend(liblist)
-      retcode = execCompilation(execlist)
+      retcode = execCompilation(execlist, options)
       if retcode != 0:
         print("...Error compiling with " + os.path.basename(llvmgcc) + ", trying with " + os.path.basename(llvmgxx) + ".") 
         execlist[0] = llvmgxx
-        retcode = execCompilation(execlist)
+        retcode = execCompilation(execlist, options)
     if retcode == 0:
       execlist = [llvmgcc, '-o', fifile + '.exe', fifile + '.o', '-L'+llfilinklib , '-lllfi-rt']
       execlist.extend(liblist)
-      retcode = execCompilation(execlist)
+      retcode = execCompilation(execlist, options)
       if retcode != 0:
         print("...Error compiling with " + os.path.basename(llvmgcc) + ", trying " + os.path.basename(llvmgxx) + ".") 
         execlist[0] = llvmgxx
-        retcode = execCompilation(execlist)
+        retcode = execCompilation(execlist, options)
 
 
     for tmpfile in tmpfiles:
@@ -374,15 +361,5 @@ def compileProg():
     else:
       print("\nSuccess", file=sys.stderr)
 
-
-################################################################################
-def main(args):
-  parseArgs(args)
-  checkInputYaml()
-  readCompileOption()
-  compileProg()
-
-################################################################################
-
 if __name__=="__main__":
-  main(sys.argv[1:])
+  run(sys.argv[1:])

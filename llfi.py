@@ -9,14 +9,14 @@ LLFI is a toolchain used to inject faults into application code.
 import sys
 
 # LLFI imports
-import bin.inject as inject
+import bin.injectfault as injectfault
 import bin.instrument as instrument
 
 # Accepted commands mapped to their corresponding module, executed in the
 # form `llfi <cmd>`
 cmds = {
   'help' : int,
-  'inject' : inject,
+  'inject' : injectfault,
   'instrument' : instrument,
 }
 
@@ -54,11 +54,11 @@ if __name__ == '__main__':
       print_usage()
       print_help()
   else:
-    try:
-      # Execute command!
-      cmds[cmd].run(args)
-    except:
+    if cmd not in cmds:
       print "llfi: {!r} is not a recognized command.".format(cmd)
       print_usage()
       sys.exit(1)
+
+    # Execute command!
+    cmds[cmd].run(args)
 
