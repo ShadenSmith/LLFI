@@ -6,7 +6,7 @@ executables, depending on the -IRonly option) with instrumented profiling and
 fault injection function calls
 
 
-Prerequisite:
+Prerequisites:
   1. 'input.yaml' contains appropriate options for LLFI and must be under the
      same directory as IR_FILE
 """
