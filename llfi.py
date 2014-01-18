@@ -11,6 +11,7 @@ import sys
 # LLFI imports
 import bin.inject as inject
 import bin.instrument as instrument
+import bin.profile as profile
 
 # Accepted commands mapped to their corresponding module, executed in the
 # form `llfi <cmd>`
@@ -18,6 +19,7 @@ cmds = {
   'help' : int,
   'inject' : inject,
   'instrument' : instrument,
+  'profile' : profile,
 }
 
 def print_usage():
