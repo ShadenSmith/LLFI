@@ -11,7 +11,7 @@ Prerequisites:
      FI_EXE.
   3. llfi-inject only checks recursively at the current directory for possible
      outputs, if your output is not under current directory, you need to store
-     that output by yourself
+     that output by yourself.
   4. You need to put input files (if any) in the current working directory.
 """
 
