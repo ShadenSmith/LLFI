@@ -4,9 +4,10 @@ include(../config/copy_utils.cmake)
 
 project(bin)
 
-copy(instrument.py instrument)
-copy(injectfault.py injectfault)
-copy(profile.py profile)
+copy(instrument.py instrument.py)
+copy(inject.py inject.py)
+copy(profile.py profile.py)
+copy(__init__.py __init__.py)
 
 genCopy()
 
