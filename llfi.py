@@ -12,6 +12,7 @@ import sys
 import bin.inject as inject
 import bin.instrument as instrument
 import bin.profile as profile
+import tools.stats as stats
 
 # Accepted commands mapped to their corresponding module, executed in the
 # form `llfi <cmd>`
@@ -20,6 +21,7 @@ cmds = {
   'inject' : inject,
   'instrument' : instrument,
   'profile' : profile,
+  'stats' : stats,
 }
 
 def print_usage():
@@ -50,7 +52,7 @@ if __name__ == '__main__':
       try:
         cmds[args[0]].help()
       except:
-        print "llfi: {!r} is a recognized command.".format(args[0])
+        print "llfi: {!r} is not a recognized command.".format(args[0])
         print_usage()
     else:
       print_usage()
