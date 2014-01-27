@@ -271,9 +271,6 @@ def checkValues(key, val, var1 = None,var2 = None,var3 = None,var4 = None):
 def run(args):
   global outputfile, totalcycles,run_id, return_codes
 
-  # Maintain a dict of all return codes received and print summary at end
-  return_codes = {}
-
   parser = initParser()
   options = parseArgs(parser, args)
   checkInputYaml()
@@ -297,6 +294,12 @@ def run(args):
   else:
     print "======Fault Injection======"
     for ii, run in enumerate(rOpt):
+      # Maintain a dict of all return codes received and print summary at end
+      return_codes = {}
+
+      # Put an empty line between configs
+      if ii > 0:
+        print ""
       print "---FI Config #"+str(ii)+"---"
 
       if "numOfRuns" not in run["run"]:
@@ -392,13 +395,14 @@ def run(args):
         # Print updates
         print_progressbar(index, run_number)
 
-    print_progressbar(run_number, run_number)
-    # Print summary
-    if yaml_options["verbose"]:
-      print("\n========== SUMMARY ==========")
-      print("Return codes:")
-      for r in return_codes.keys():
-        print("  %3s: %5d" % (str(r), return_codes[r]))
+      print_progressbar(run_number, run_number)
+      print "" # progress bar needs a newline after 100% reached
+      # Print summary
+      if yaml_options["verbose"]:
+        print("========== SUMMARY ==========")
+        print("Return codes:")
+        for r in return_codes.keys():
+          print("  %3s: %5d" % (str(r), return_codes[r]))
 
 ################################################################################
 
