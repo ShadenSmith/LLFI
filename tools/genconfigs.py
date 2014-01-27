@@ -1,4 +1,8 @@
 #!/usr/bin/env python2
+'''
+llfi-genconfigs scans an LLFI output directory and generates config files for
+reproducing faults
+'''
 
 import os
 import sys
@@ -9,8 +13,7 @@ import argparse
 # Commonly used parameters - see processArgs()
 params = None
 
-def processArgs():
-  global params
+def InitParser():
   parser = argparse.ArgumentParser()
   parser.add_argument('DIR', help='base LLFI output directory')
   parser.add_argument('-n' , '--nconfigs', help='number of configs to print',
@@ -20,7 +23,11 @@ def processArgs():
   parser.add_argument('-g' , '--group', help='run group ID to scan',
                       default=0, type=int)
   parser.add_argument('-v' , '--verbose', action='store_true')
-  params = parser.parse_args()
+  return parser
+
+def processArgs(parser, args):
+  global params
+  params = parser.parse_args(args)
 
 def getErrorFiles(group=0):
   """
@@ -92,7 +99,8 @@ def printConfigs(configs):
       print ""
 
 if __name__ == '__main__':
-  processArgs()
+  parser = InitParser()
+  processArgs(parser, sys.argv[1:])
 
   if(params.verbose):
     print "Processing runs with return code: {}".format(params.code)
