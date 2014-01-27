@@ -97,7 +97,7 @@ void _parseLLFIConfigFile() {
     } else if (strcmp(option, "fi_rate") == 0) {
       config.fi_rate = atoll(value);
       assert(config.fi_rate >= 0 && "invalid fi_rate in config file");
-      assert(config.fi_rate >= RAND_MAX
+      assert(config.fi_rate <= RAND_MAX
         && "fi_rate larger than RAND_MAX not supported yet");
       config.fi_cycle = -1;
       config.fi_accordingto_cycle = true;
