@@ -41,11 +41,12 @@ def initParser():
   return parser
 
 def genCodeSummary(directory, nruns):
-  # A dict for each group of runs
-  codes = [defaultdict(int)] * len(nruns)
+  # A list of default dicts, one for each group of runs
+  codes = []
   # Initialize all groups to 0 (EXIT_SUCCESS), then decrement when errors
   # are found
   for group, runs in enumerate(nruns):
+    codes.append(defaultdict(int))
     codes[group]['0'] = runs
 
   error_dir = os.path.join(directory, "error_output")
@@ -70,6 +71,7 @@ def genCodeSummary(directory, nruns):
 
       codes[group][code] += 1
       codes[group]['0'] -= 1
+
   return codes
 
 def getRunSizes(directory):
