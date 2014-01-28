@@ -24,6 +24,8 @@ import time
 import random
 import shutil
 import argparse
+import resource
+from collections import defaultdict
 
 runOverride = False
 timeout = 500
@@ -138,40 +140,38 @@ def config(fi_exe):
     os.mkdir(llfi_stat_dir)
 
 ################################################################################
+def set_timeout():
+  resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout))
+
 def execute( execlist):
   global outputfile
   global return_codes
   #get state of directory
   dirSnapshot()
-  p = subprocess.Popen(execlist, stdout = subprocess.PIPE)
-  elapsetime = 0
-  while (elapsetime < timeout):
-    elapsetime += 1
-    time.sleep(1)
-    if p.poll() is not None:
-      moveOutput()
-      outputFile = open(outputfile, "wb")
-      outputFile.write(p.communicate()[0])
-      outputFile.close()
-      replenishInput() #for cases where program deletes input or alters them each run
-      # Keep a dict of all return codes received.
-      if p.returncode in return_codes:
-        return_codes[p.returncode] += 1
-      else:
-        return_codes[p.returncode] = 1
-      return str(p.returncode)
 
-  # child timed out!
-  if "TO" in return_codes:
-    return_codes["TO"] += 1
-  else:
-    return_codes["TO"] = 1
-  p.kill()
+  # Run process!
+  p_time = -time.time()
+  p = subprocess.Popen(execlist, stdout = subprocess.PIPE,
+                       preexec_fn = set_timeout)
+  p_stdout = p.communicate()[0] # blocks until p is finished
+  p_time += time.time()
 
   moveOutput()
-  replenishInput()
+  outputFile = open(outputfile, "w")
+  outputFile.write(p_stdout)
+  outputFile.close()
+  replenishInput() #for cases where program deletes input or alters them each run
 
-  return "timed-out"
+  p_retcode = p.returncode
+
+  # return code -9 is from a timeout
+  if p_retcode != -9:
+    return_codes[p_retcode] += 1
+  else:
+    p_retcode = 'timed-out'
+    return_codes['TO'] += 1
+
+  return str(p.returncode)
 
 ################################################################################
 def storeInputFiles(exe_args):
@@ -277,7 +277,7 @@ def run(args):
 
   parseArgs(args)
   # Maintain a dict of all return codes received and print summary at end
-  return_codes = {}
+  return_codes = defaultdict(int)
 
   parser = initParser()
   options = parseArgs(parser, args)
