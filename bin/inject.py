@@ -24,6 +24,8 @@ import time
 import random
 import shutil
 import argparse
+import resource
+from collections import defaultdict
 
 runOverride = False
 timeout = 500
@@ -117,13 +119,14 @@ def print_progressbar(idx, nruns):
 
 ################################################################################
 def config(fi_exe):
-  global inputdir, outputdir, errordir, stddir, llfi_stat_dir
+  global inputdir, outputdir, errordir, stddir, llfi_stat_dir, logdir
   # config
   llfi_dir = os.path.dirname(fi_exe)
   inputdir = os.path.join(llfi_dir, "prog_input")
   outputdir = os.path.join(llfi_dir, "prog_output")
   errordir = os.path.join(llfi_dir, "error_output")
   stddir = os.path.join(llfi_dir, "std_output")
+  logdir = os.path.join(llfi_dir, "log_output")
   llfi_stat_dir = os.path.join(llfi_dir, "llfi_stat_output")
 
   if not os.path.isdir(outputdir):
@@ -134,44 +137,44 @@ def config(fi_exe):
     os.mkdir(inputdir)
   if not os.path.isdir(stddir):
     os.mkdir(stddir)
+  if not os.path.isdir(logdir):
+    os.mkdir(logdir)
   if not os.path.isdir(llfi_stat_dir):
     os.mkdir(llfi_stat_dir)
 
 ################################################################################
-def execute( execlist):
+def set_timeout():
+  resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout))
+
+def execute(execlist):
   global outputfile
   global return_codes
   #get state of directory
   dirSnapshot()
-  p = subprocess.Popen(execlist, stdout = subprocess.PIPE)
-  elapsetime = 0
-  while (elapsetime < timeout):
-    elapsetime += 1
-    time.sleep(1)
-    if p.poll() is not None:
-      moveOutput()
-      outputFile = open(outputfile, "w")
-      outputFile.write(p.communicate()[0])
-      outputFile.close()
-      replenishInput() #for cases where program deletes input or alters them each run
-      # Keep a dict of all return codes received.
-      if p.returncode in return_codes:
-        return_codes[p.returncode] += 1
-      else:
-        return_codes[p.returncode] = 1
-      return str(p.returncode)
 
-  # child timed out!
-  if "TO" in return_codes:
-    return_codes["TO"] += 1
-  else:
-    return_codes["TO"] = 1
-  p.kill()
+  # Run process!
+  p_time = -time.time()
+  p = subprocess.Popen(execlist, stdout = subprocess.PIPE,
+                       preexec_fn = set_timeout)
+  p_stdout = p.communicate()[0] # blocks until p is finished
+  p_time += time.time()
 
   moveOutput()
-  replenishInput()
+  outputFile = open(outputfile, "w")
+  outputFile.write(p_stdout)
+  outputFile.close()
+  replenishInput() #for cases where program deletes input or alters them each run
 
-  return "timed-out"
+  p_retcode = p.returncode
+
+  # return code -9 is from a timeout
+  if p_retcode != -9:
+    return_codes[p_retcode] += 1
+  else:
+    p_retcode = 'timed-out'
+    return_codes['TO'] += 1
+
+  return (str(p.returncode), p_time)
 
 ################################################################################
 def storeInputFiles(exe_args):
@@ -299,7 +302,7 @@ def run(args):
     print "======Fault Injection======"
     for ii, run in enumerate(rOpt):
       # Maintain a dict of all return codes received and print summary at end
-      return_codes = {}
+      return_codes = defaultdict(int)
 
       # Put an empty line between configs
       if ii > 0:
@@ -389,7 +392,7 @@ def run(args):
         # print run index before executing. Comma removes newline for prettier
         # formatting
         execlist.extend(options.EXE_ARGS)
-        ret = execute(execlist)
+        (ret, tot_time) = execute(execlist)
         if ret == "timed-out":
           error_File = open(errorfile, 'w')
           error_File.write("Program hang\n")
@@ -402,6 +405,11 @@ def run(args):
           error_File = open(errorfile, 'w')
           error_File.write("Program crashed, terminated by itself, return code " + ret + '\n')
           error_File.close()
+
+        # Log time and return code information
+        logname = os.path.join(logdir, 'logfile-run-{}.txt'.format(run_id))
+        with open(logname, 'a') as logfile:
+          logfile.write('code={}, time={:0.3f}\n'.format(ret,tot_time))
 
         # Print updates
         print_progressbar(index, run_number)
