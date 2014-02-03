@@ -25,6 +25,7 @@ import random
 import shutil
 import argparse
 import resource
+import glob
 from collections import defaultdict
 
 runOverride = False
@@ -303,6 +304,7 @@ def run(args):
     for ii, run in enumerate(rOpt):
       # Maintain a dict of all return codes received and print summary at end
       return_codes = defaultdict(int)
+      tot_time = 0.0
 
       # Put an empty line between configs
       if ii > 0:
@@ -392,7 +394,9 @@ def run(args):
         # print run index before executing. Comma removes newline for prettier
         # formatting
         execlist.extend(options.EXE_ARGS)
-        (ret, tot_time) = execute(execlist)
+        ret, curr_time = execute(execlist)
+        tot_time += curr_time
+
         if ret == "timed-out":
           error_File = open(errorfile, 'w')
           error_File.write("Program hang\n")
@@ -409,7 +413,7 @@ def run(args):
         # Log time and return code information
         logname = os.path.join(logdir, 'logfile-run-{}.txt'.format(run_id))
         with open(logname, 'a') as logfile:
-          logfile.write('code={}, time={:0.3f}\n'.format(ret,tot_time))
+          logfile.write('code={}, time={:0.3f}\n'.format(ret,curr_time))
 
         # Print updates
         print_progressbar(index, run_number)
@@ -422,6 +426,27 @@ def run(args):
         print("Return codes:")
         for r in return_codes.keys():
           print("  %3s: %5d" % (str(r), return_codes[r]))
+
+      # write summary file
+      summary_file = os.path.join(logdir, 'summaryfile-run-{}'.format(ii))
+      with open(summary_file, 'w') as f:
+        f.write('runs: {}\n'.format(run_number))
+        avg_time = tot_time / run_number
+        f.write('avg time: {:0.3f}\n'.format(avg_time))
+
+        if 'fi_rate' in locals():
+          f.write('fi_rate: {}\n'.format(fi_rate))
+          f.write('faults expected: {:0.3f}\n'.format(float(totalcycles) / float(fi_rate)))
+          # count average number of injected faults
+          nfaults = 0
+          base = os.path.join(llfi_stat_dir,'llfi.stat.fi.injectedfaults.{}-*'.format(ii))
+          logs = glob.glob(base)
+          for log in logs:
+            with open(log,'r') as log_f:
+              nfaults += sum(1 for line in log_f)
+          avg_faults = float(nfaults) / run_number
+
+          f.write('faults avg: {:0.3f}\n'.format(avg_faults))
 
 ################################################################################
 
