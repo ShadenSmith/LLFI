@@ -153,17 +153,16 @@ def execute( execlist):
   #get state of directory
   dirSnapshot()
 
+  outputFile = open(outputfile, "w")
   # Run process!
   p_time = -time.time()
-  p = subprocess.Popen(execlist, stdout = subprocess.PIPE,
+  p = subprocess.Popen(execlist, stdout = outputFile,
                        preexec_fn = set_timeout)
-  p_stdout = p.communicate()[0] # blocks until p is finished
+  p.wait()
   p_time += time.time()
 
-  moveOutput()
-  outputFile = open(outputfile, "w")
-  outputFile.write(p_stdout)
   outputFile.close()
+  moveOutput()
   replenishInput() #for cases where program deletes input or alters them each run
 
   p_retcode = p.returncode
