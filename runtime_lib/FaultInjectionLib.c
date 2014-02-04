@@ -10,6 +10,9 @@
 
 static long long curr_cycle = 0;
 
+/* track number of faults injected if using fi_rate */
+static long nfaults = 0;
+
 static FILE *injectedfaultsFile;
 
 
@@ -22,13 +25,19 @@ static struct {
   // if both fi_cycle and fi_index are specified, use fi_cycle
   long long fi_cycle;
   long fi_index;
+  /* (1/fi_rate) chance of injecting per cycle.
+   * TODO: Currently overwrites fi_cycle to keep other functionality untouched.
+   * This should probably be changed in the future. For now, the user must
+   * either specify fi_rate or fi_cycle.
+   */
+  long long fi_rate;
 
   // NOTE: the following config are randomly generated if not specified
   // in practice, use the following two configs only when you want to reproduce
   // a previous fault injection experiment
   int fi_reg_index;
   int fi_bit;
-} config = {"bitflip", false, -1, -1, -1, -1}; 
+} config = {"bitflip", false, -1, -1, -1, -1, -1};
 // -1 to tell the value is not specified in the config file
 
 // declaration of the real implementation of the fault injection function
@@ -85,6 +94,17 @@ void _parseLLFIConfigFile() {
       config.fi_accordingto_cycle = true;
       config.fi_cycle = atoll(value);
       assert(config.fi_cycle >= 0 && "invalid fi_cycle in config file");
+    } else if (strcmp(option, "fi_rate") == 0) {
+      config.fi_rate = atoll(value);
+      assert(config.fi_rate >= 0 && "invalid fi_rate in config file");
+      assert(config.fi_rate <= RAND_MAX
+        && "fi_rate larger than RAND_MAX not supported yet");
+      config.fi_cycle = -1;
+      config.fi_accordingto_cycle = true;
+      /* disable fault injection */
+      if(config.fi_rate == 0) {
+        config.fi_rate = -1;
+      }
     } else if (strcmp(option, "fi_index") == 0) {
       config.fi_index = atol(value);
       assert(config.fi_index >= 0 && "invalid fi_index in config file");
@@ -95,15 +115,20 @@ void _parseLLFIConfigFile() {
       config.fi_bit = atoi(value);
       assert(config.fi_bit >= 0 && "invalid fi_bit in config file");
     } else {
-      fprintf(stderr, 
+      fprintf(stderr,
               "ERROR: Unknown option %s for LLFI runtime fault injection\n",
               option);
       exit(1);
     }
   }
+  if(config.fi_rate >= 0 && config.fi_cycle >= 0) {
+    fprintf(stderr,
+            "ERROR: fi_rate and fi_cycle cannot both be specified.\n");
+    exit(1);
+  }
   /*
-  debug(("type, %s; cycle, %lld; index, %ld; reg_index, %d; fi_bit, %d\n", 
-         config.fi_type, config.fi_cycle, config.fi_index, 
+  debug(("type, %s; cycle, %lld; index, %ld; reg_index, %d; fi_bit, %d\n",
+         config.fi_type, config.fi_cycle, config.fi_index,
          config.fi_reg_index, config.fi_bit));
   */
   fclose(ficonfigFile);
@@ -129,17 +154,24 @@ void initInjections() {
   start_tracing_flag = TRACING_FI_RUN_INIT; //Tell instTraceLib that we are going to inject faults
 }
 
-bool preFunc(long llfi_index, unsigned opcode, unsigned my_reg_index, 
+bool preFunc(long llfi_index, unsigned opcode, unsigned my_reg_index,
              unsigned total_reg_target_num) {
-  assert(opcodecyclearray[opcode] >= 0 && 
+  assert(opcodecyclearray[opcode] >= 0 &&
           "opcode does not exist, need to update instructions.def");
   if (my_reg_index == 0)
     is_fault_injected_in_curr_dyn_inst = false;
 
+  if (config.fi_rate > -1) {
+    if ((rand() % config.fi_rate) == 0) {
+      config.fi_cycle = curr_cycle;
+      printf("Injecting fault at cycle %lld\n", curr_cycle);
+    }
+  }
+
   bool inst_selected = false;
   bool reg_selected = false;
   if (config.fi_accordingto_cycle) {
-    if (config.fi_cycle >= curr_cycle && 
+    if (config.fi_cycle >= curr_cycle &&
         config.fi_cycle < curr_cycle + opcodecyclearray[opcode])
       inst_selected = true;
   } else {
@@ -154,7 +186,7 @@ bool preFunc(long llfi_index, unsigned opcode, unsigned my_reg_index,
     // NOTE: if fi_reg_index specified, use it, otherwise, randomly generate
     if (config.fi_reg_index >= 0)
       reg_selected = (my_reg_index == config.fi_reg_index);
-    else 
+    else
       reg_selected = _getDecision(1.0 / (total_reg_target_num - my_reg_index));
 
     if (reg_selected) {
@@ -169,13 +201,15 @@ bool preFunc(long llfi_index, unsigned opcode, unsigned my_reg_index,
   return reg_selected;
 }
 
-void injectFunc(long llfi_index, unsigned size, 
+void injectFunc(long llfi_index, unsigned size,
                 char *buf, unsigned my_reg_index) {
 
   start_tracing_flag = TRACING_FI_RUN_FAULT_INSERTED; //Tell instTraceLib that we have injected a fault
 
   unsigned fi_bit, fi_bytepos, fi_bitpos;
   unsigned char oldbuf;
+
+  nfaults++;
 
   // NOTE: if fi_bit specified, use it, otherwise, randomly generate
   if (config.fi_bit >= 0)
@@ -185,25 +219,25 @@ void injectFunc(long llfi_index, unsigned size,
   assert (fi_bit < size && "fi_bit larger than the target size");
   fi_bytepos = fi_bit / 8;
   fi_bitpos = fi_bit % 8;
-  
+
   memcpy(&oldbuf, &buf[fi_bytepos], 1);
 
 
-  fprintf(injectedfaultsFile, 
+  fprintf(injectedfaultsFile,
           "FI stat: fi_type=%s, fi_index=%ld, fi_cycle=%lld, fi_reg_index=%u, "
-          "fi_bit=%u\n", config.fi_type,
-          llfi_index, config.fi_cycle, my_reg_index, fi_bit);
-	fflush(injectedfaultsFile); 
-  
+          "fi_bit=%u nfaults=%ld\n", config.fi_type,
+          llfi_index, config.fi_cycle, my_reg_index, fi_bit, nfaults);
+	fflush(injectedfaultsFile);
+
   injectFaultImpl(config.fi_type, llfi_index, size, fi_bit, buf);
   /*
   debug(("FI stat: fi_type=%s, fi_index=%ld, fi_cycle=%lld, fi_reg_index=%u, "
          "fi_bit=%u, size=%u, old=0x%hhx, new=0x%hhx\n", config.fi_type,
-            llfi_index, config.fi_cycle, my_reg_index, fi_bit, 
+            llfi_index, config.fi_cycle, my_reg_index, fi_bit,
             size,  oldbuf, buf[fi_bytepos]));
-*/
+  */
 }
 
 void postInjections() {
-	fclose(injectedfaultsFile); 
+	fclose(injectedfaultsFile);
 }
