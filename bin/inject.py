@@ -26,6 +26,7 @@ import shutil
 import argparse
 import resource
 import glob
+import threading
 from collections import defaultdict
 
 runOverride = False
@@ -150,22 +151,42 @@ def set_timeout():
 def execute(execlist):
   global outputfile
   global return_codes
+
+  # stores the process obj and the process execution time.
+  # this is an array so we can modify it directly in run_prog()
+  p = [None, None]
+  def run_prog():
+    # Run process!
+    p_time = -time.time()
+    p[0] = subprocess.Popen(execlist, stdout = outputFile,
+                            preexec_fn = set_timeout)
+    p[0].communicate()
+    p_time += time.time()
+    p[1] = p_time
+
   #get state of directory
   dirSnapshot()
 
-  outputFile = open(outputfile, "w")
-  # Run process!
-  p_time = -time.time()
-  p = subprocess.Popen(execlist, stdout = outputFile,
-                       preexec_fn = set_timeout)
-  p.wait()
-  p_time += time.time()
+  with open(outputfile, "w") as outputFile:
+    # Some process hangs aren't solved by setrlimit(), so they're now spawned
+    # in a thread that is joined with a timeout. This is a hack, but I'm not
+    # sure of a better way to do this.
+    t = threading.Thread(target=run_prog)
+    t.start()
+    # +1 for padding, that way we only catch the problematic hangs
+    t.join(timeout + 1)
 
-  outputFile.close()
+    if not t.is_alive():
+      p_retcode = p[0].returncode
+    else:
+      # Process hang, terminate it and manually set return code info
+      p[0].terminate()
+      p[0].returncode = -9 # timeout
+      p[1] = timeout
+      p_retcode = -9
+
   moveOutput()
   replenishInput() #for cases where program deletes input or alters them each run
-
-  p_retcode = p.returncode
 
   # return code -9 is from a timeout
   if p_retcode != -9:
@@ -174,7 +195,7 @@ def execute(execlist):
     p_retcode = 'timed-out'
     return_codes['TO'] += 1
 
-  return (str(p.returncode), p_time)
+  return (str(p[0].returncode), p[1])
 
 ################################################################################
 def storeInputFiles(exe_args):
