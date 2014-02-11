@@ -61,6 +61,16 @@ bool _getDecision(double probability) {
   return (rand() / (RAND_MAX * 1.0)) <= probability;
 }
 
+/* Lightweight linear congruential generator */
+unsigned long long fast_seed;
+unsigned long long fast_rand(long long max) {
+  unsigned long long A = 6364136223846793005;
+  unsigned long long M = (1 << 31);
+
+  fast_seed = (fast_seed*A + 1) % M;
+  return fast_seed % max;
+}
+
 void _parseLLFIConfigFile() {
   char ficonfigfilename[80];
   strncpy(ficonfigfilename, "llfi.config.fi.txt", 80);
@@ -151,6 +161,7 @@ void initInjections() {
     exit(1);
   }
 
+  fast_seed = rand();
   start_tracing_flag = TRACING_FI_RUN_INIT; //Tell instTraceLib that we are going to inject faults
 }
 
@@ -162,9 +173,10 @@ bool preFunc(long llfi_index, unsigned opcode, unsigned my_reg_index,
     is_fault_injected_in_curr_dyn_inst = false;
 
   if (config.fi_rate > -1) {
-    if ((rand() % config.fi_rate) == 0) {
+    if (fast_rand(config.fi_rate) == 0) {
       config.fi_cycle = curr_cycle;
       printf("Injecting fault at cycle %lld\n", curr_cycle);
+      fflush(stdout);
     }
   }
 
