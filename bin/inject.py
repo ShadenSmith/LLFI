@@ -456,7 +456,10 @@ def run(args):
 
         if 'fi_rate' in locals():
           f.write('fi_rate: {}\n'.format(fi_rate))
-          f.write('faults expected: {:0.3f}\n'.format(float(totalcycles) / float(fi_rate)))
+          expected = 0
+          if fi_rate != 0:
+            expected = float(totalcycles) / float(fi_rate)
+          f.write('faults expected: {:0.3f}\n'.format(expected))
           # count average number of injected faults
           nfaults = 0
           base = os.path.join(llfi_stat_dir,'llfi.stat.fi.injectedfaults.{}-*'.format(ii))
