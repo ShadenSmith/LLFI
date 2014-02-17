@@ -61,13 +61,13 @@ bool _getDecision(double probability) {
   return (rand() / (RAND_MAX * 1.0)) <= probability;
 }
 
-/* Lightweight linear congruential generator */
+/* Lightweight linear congruential generator using constants by Knuth */
 unsigned long long fast_seed;
 unsigned long long fast_rand(long long max) {
   unsigned long long A = 6364136223846793005;
-  unsigned long long M = (1 << 31);
+  unsigned long long c = 1442695040888963407;
 
-  fast_seed = (fast_seed*A + 1) % M;
+  fast_seed = (fast_seed * A) + c; /* implicit mod 2^64 */
   return fast_seed % max;
 }
 
