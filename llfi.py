@@ -2,6 +2,8 @@
 '''
 LLFI - LLVM based Fault Injector
 
+usage: llfi CMD [args]
+
 LLFI is a toolchain used to inject faults into application code.
 '''
 
@@ -22,9 +24,6 @@ cmds = {
   'profile' : profile,
 }
 
-def print_usage():
-  print "usage: llfi CMD [args]"
-
 def print_help():
   s = \
 '''{}
@@ -36,31 +35,30 @@ You can use `llfi help CMD` for information about a specific tool.
   print s.format(__doc__, '\n    '.join(sorted(cmds.keys())))
 
 if __name__ == '__main__':
+  # Empty invocation, just print help
   if len(sys.argv) == 1:
-    # Empty invocation, just print help
-    print_usage()
     print_help()
     sys.exit(0)
 
   cmd = sys.argv[1]
-  args = sys.argv[2:]
+  args = sys.argv[2:] # possibly []
 
-  if cmd == 'help':
-    if args:
-      try:
-        cmds[args[0]].help()
-      except:
-        print "llfi: {!r} is a recognized command.".format(args[0])
-        print_usage()
-    else:
-      print_usage()
+  if cmd == 'help' or cmd == '-h':
+    if len(args) == 0:
       print_help()
-  else:
-    if cmd not in cmds:
-      print "llfi: {!r} is not a recognized command.".format(cmd)
-      print_usage()
-      sys.exit(1)
+    elif args[0] in cmds:
+      cmds[args[0]].help() # specific sub-command help
+    else:
+      print "llfi: {!r} is not a recognized command.".format(args[0])
+      print_help()
+    sys.exit(0)
 
-    # Execute command!
-    cmds[cmd].run(args)
+  # Check for invalid command
+  if cmd not in cmds:
+    print "llfi: {!r} is not a recognized command.".format(cmd)
+    print_help()
+    sys.exit(1)
+
+  # Execute command!
+  cmds[cmd].run(args)
 
