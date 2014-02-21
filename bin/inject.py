@@ -271,6 +271,10 @@ def checkValues(key, val, var1 = None,var2 = None,var3 = None,var4 = None):
     assert isinstance(val, int)==True, key+" must be an integer in input.yaml"
     assert int(val) >= 0, key+" must be greater than or equal to 0 in input.yaml"
 
+  elif key == 'fi_exp':
+    assert isinstance(val, int)==True, key+" must be an integer in input.yaml"
+    assert int(val) >= 0, key+" must be greater than or equal to 0 in input.yaml"
+
   elif key == 'fi_index':
     assert isinstance(val, int)==True, key+" must be an integer in input.yaml"
     assert int(val) >= 0, key+" must be greater than or equal to 0 in input.yaml"
@@ -349,6 +353,8 @@ def run(args):
         del fi_cycle
       if 'fi_rate' in locals():
         del fi_rate
+      if 'fi_exp' in locals():
+        del fi_exp
       if 'fi_index' in locals():
         del fi_index
       if 'fi_reg_index' in locals():
@@ -366,6 +372,13 @@ def run(args):
       if "fi_rate" in run["run"]:
         fi_rate=run["run"]["fi_rate"]
         checkValues("fi_rate",fi_rate)
+      if "fi_exp" in run["run"]:
+        fi_exp=run["run"]["fi_exp"]
+        checkValues("fi_exp",fi_exp)
+        if fi_exp == 0:
+          fi_rate = 0
+        else:
+          fi_rate = int(int(totalcycles) / fi_exp)
       if "fi_index" in run["run"]:
         fi_index=run["run"]["fi_index"]
         checkValues("fi_index",fi_index)
