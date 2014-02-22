@@ -148,7 +148,7 @@ def config(fi_exe):
 def set_timeout():
   resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout))
 
-def execute( execlist):
+def execute(execlist):
   global outputfile
   global return_codes
 
@@ -302,9 +302,6 @@ def checkValues(key, val, var1 = None,var2 = None,var3 = None,var4 = None):
 ################################################################################
 def run(args):
   global outputfile, totalcycles,run_id, return_codes
-
-  # Maintain a dict of all return codes received and print summary at end
-  return_codes = defaultdict(int)
 
   parser = initParser()
   options = parseArgs(parser, args)
@@ -462,6 +459,30 @@ def run(args):
         print("Return codes:")
         for r in list(return_codes.keys()):
           print(("  %3s: %5d" % (str(r), return_codes[r])))
+
+      # write summary file
+      summary_file = os.path.join(logdir, 'summaryfile-run-{}'.format(ii))
+      with open(summary_file, 'w') as f:
+        f.write('runs: {}\n'.format(run_number))
+        avg_time = tot_time / run_number
+        f.write('avg time: {:0.3f}\n'.format(avg_time))
+
+        if 'fi_rate' in locals():
+          f.write('fi_rate: {}\n'.format(fi_rate))
+          expected = 0
+          if fi_rate != 0:
+            expected = float(totalcycles) / float(fi_rate)
+          f.write('faults expected: {:0.3f}\n'.format(expected))
+          # count average number of injected faults
+          nfaults = 0
+          base = os.path.join(llfi_stat_dir,'llfi.stat.fi.injectedfaults.{}-*'.format(ii))
+          logs = glob.glob(base)
+          for log in logs:
+            with open(log,'r') as log_f:
+              nfaults += sum(1 for line in log_f)
+          avg_faults = float(nfaults) / run_number
+
+          f.write('faults avg: {:0.3f}\n'.format(avg_faults))
 
       # write summary file
       summary_file = os.path.join(logdir, 'summaryfile-run-{}'.format(ii))

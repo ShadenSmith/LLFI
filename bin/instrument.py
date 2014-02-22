@@ -335,7 +335,7 @@ def compileProg(options, compileOptions):
       execlist.extend(liblist)
       retcode = execCompilation(execlist, options)
       if retcode != 0:
-        print("...Error compiling with " + os.path.basename(llvmgcc) + ", trying with " + os.path.basename(llvmgxx) + ".") 
+        print("...Error compiling with " + os.path.basename(llvmgcc) + ", trying with " + os.path.basename(llvmgxx) + ".")
         execlist[0] = llvmgxx
         retcode = execCompilation(execlist, options)
     if retcode == 0:
@@ -343,7 +343,7 @@ def compileProg(options, compileOptions):
       execlist.extend(liblist)
       retcode = execCompilation(execlist, options)
       if retcode != 0:
-        print("...Error compiling with " + os.path.basename(llvmgcc) + ", trying " + os.path.basename(llvmgxx) + ".") 
+        print("...Error compiling with " + os.path.basename(llvmgcc) + ", trying " + os.path.basename(llvmgxx) + ".")
         execlist[0] = llvmgxx
         retcode = execCompilation(execlist, options)
 
