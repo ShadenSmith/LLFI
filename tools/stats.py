@@ -98,10 +98,10 @@ def getRunSizes(directory):
   return runs
 
 def printCodeSummary(codes, nruns):
-  print "Return codes:"
+  print("Return codes:")
   for g,c in enumerate(codes):
-    print "Group: {} [{} runs]".format(g, nruns[int(g)])
+    print("Group: {} [{} runs]".format(g, nruns[int(g)]))
     for k in sorted(c.keys()):
-      print "   {:>3s}: {:>5,}".format(k, c[k])
-    print ""
+      print("   {:>3s}: {:>5,}".format(k, c[k]))
+    print("")
 

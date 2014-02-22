@@ -120,7 +120,7 @@ def print_progressbar(idx, nruns):
 
 
 ################################################################################
-def config():
+def config(fi_exe):
   global inputdir, outputdir, errordir, stddir, llfi_stat_dir, logdir
   # config
   llfi_dir = os.path.dirname(fi_exe)
@@ -303,7 +303,6 @@ def checkValues(key, val, var1 = None,var2 = None,var3 = None,var4 = None):
 def run(args):
   global outputfile, totalcycles,run_id, return_codes
 
-  parseArgs(args)
   # Maintain a dict of all return codes received and print summary at end
   return_codes = defaultdict(int)
 
@@ -458,7 +457,7 @@ def run(args):
       print_progressbar(run_number, run_number)
       print("") # progress bar needs a newline after 100% reached
       # Print summary
-      if options["verbose"]:
+      if yaml_options["verbose"]:
         print("========== SUMMARY ==========")
         print("Return codes:")
         for r in list(return_codes.keys()):
