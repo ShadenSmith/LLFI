@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 '''
 LLFI - LLVM based Fault Injector
 
@@ -14,10 +14,12 @@ import sys
 import bin.inject as inject
 import bin.instrument as instrument
 import bin.profile as profile
+import tools.compile as compile
 
 # Accepted commands mapped to their corresponding module, executed in the
 # form `llfi <cmd>`
 cmds = {
+  'compile' : compile,
   'help' : int,
   'inject' : inject,
   'instrument' : instrument,
@@ -32,7 +34,7 @@ Supported commands are:
 
 You can use `llfi help CMD` for information about a specific tool.
 '''
-  print s.format(__doc__, '\n    '.join(sorted(cmds.keys())))
+  print(s.format(__doc__, '\n    '.join(sorted(cmds.keys()))))
 
 if __name__ == '__main__':
   # Empty invocation, just print help
@@ -49,13 +51,13 @@ if __name__ == '__main__':
     elif args[0] in cmds:
       cmds[args[0]].help() # specific sub-command help
     else:
-      print "llfi: {!r} is not a recognized command.".format(args[0])
+      print("llfi: {!r} is not a recognized command.".format(args[0]))
       print_help()
     sys.exit(0)
 
   # Check for invalid command
   if cmd not in cmds:
-    print "llfi: {!r} is not a recognized command.".format(cmd)
+    print("llfi: {!r} is not a recognized command.".format(cmd))
     print_help()
     sys.exit(1)
 

@@ -8,7 +8,7 @@ copy(tracediff.py tracediff)
 copy(traceontograph.py traceontograph)
 copy(tracetools.py tracetools.py)
 copy(traceunion.py traceunion)
-copy(compiletoIR.py compiletoIR)
+copy(compile.py compile.py)
 
 genCopy()
 
