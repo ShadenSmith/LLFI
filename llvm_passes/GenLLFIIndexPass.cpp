@@ -3,7 +3,12 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/InstIterator.h"
 #include "llvm/IR/Instruction.h"
+
+#include "llvm/DebugInfo.h"
+
 #include <cstdio>
+#include <iostream>
+
 #include "Utils.h"
 
 using namespace llvm;
@@ -29,6 +34,14 @@ bool GenLLFIIndexPass::runOnModule(Module &M) {
            ++f_it) {
         currinst = &(*f_it);
         setLLFIIndexofInst(currinst);
+        // SHADEN
+        MDNode *n = currinst->getMetadata("dbg");
+        DILocation loc(n);
+        std::cout << "Instruction: " << currinst->getOpcodeName()
+          << " line: " << loc.getFilename().str() << ": "
+          << loc.getLineNumber() << " index: " << getLLFIIndexofInst(currinst) <<  std::endl;
+        // END SHADEN
+
       }
     }
   }
