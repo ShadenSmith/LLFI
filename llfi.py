@@ -15,10 +15,12 @@ import bin.inject as inject
 import bin.instrument as instrument
 import bin.profile as profile
 import tools.stats as stats
+import tools.compile as compile
 
 # Accepted commands mapped to their corresponding module, executed in the
 # form `llfi <cmd>`
 cmds = {
+  'compile' : compile,
   'help' : int,
   'inject' : inject,
   'instrument' : instrument,

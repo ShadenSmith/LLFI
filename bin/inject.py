@@ -452,7 +452,7 @@ def run(args):
         print_progressbar(index, run_number)
 
       print_progressbar(run_number, run_number)
-      print("") # progress bar needs a newline after 100% reached
+      print("")
       # Print summary
       if yaml_options["verbose"]:
         print("========== SUMMARY ==========")

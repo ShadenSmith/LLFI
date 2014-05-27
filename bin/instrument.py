@@ -61,9 +61,9 @@ def initParser():
   parser.add_argument('IR_FILE', help='source IR file to instrument')
   parser.add_argument('--dir', default='llfi', dest='DIR',
                       help='directory to store instrumented executables')
-  parser.add_argument('-l',  action='append', metavar='LIB',
+  parser.add_argument('-l',  action='append', default=[], metavar='LIB',
                       help='link against LIB')
-  parser.add_argument('-L', action='append', metavar='DIR',
+  parser.add_argument('-L', action='append', default=[], metavar='DIR',
                       help='add DIR to search path for linking')
   parser.add_argument('--readable', action='store_true', dest='READABLE',
                       help='generate human-readable IR files')
